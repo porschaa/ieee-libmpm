@@ -1,0 +1,71 @@
+#!/bin/sh
+
+# This configure script is part of the configurator project and is 
+# designed to be universal and used to build any C library.
+# It is meant to be used with the adjacent `makefile' and `.config'
+# file.
+
+. ./.config
+
+menu()
+{
+	stdout "${projectname}
+
+${description}
+
+${copyright}
+
+
+	\`configure' script instructions
+
+	-h|--help               This menu
+	--prefix=PREFIX         main installation prefix [${prefixtype}]
+	./configure --prefix=/home/user/buildarea
+
+	
+"
+	[ ! -z "$1" ] && exit "$1"
+}
+
+prefix="${prefixtype}"
+
+for i in "$@"
+do	case "$i" in
+		-error)
+			menu
+			fatal "RUN ./configure first!!"
+			;;
+		-h|--help)
+			menu 0
+			;;
+		--prefix=*)
+			prefix=${i#*=}
+			;;
+		*)
+			fatal "$i is not a valid option !!"
+			;;
+	esac
+done
+
+
+stdout "Creating a config.mak to be sourced by the makefile"
+stdout "..."
+stdout "prefix = $prefix"
+stdout "libname = $libname"
+stdout "Attempting to produce lib${libname}.a"
+stdout "..."
+stdout "${projectname} requires a C compiler, \`make' (gmake), and \`ar'"
+stdout "this configure script does not automatically detect them"
+stdout "but instead the makefile uses the environment"
+stdout "..."
+stdout "..."
+stdout "..."
+stdout "# Automatically generated" > config.mak
+stdout "
+prefix = $prefix
+libname = $libname
+" >> config.mak
+stdout
+stdout "done."
+
+

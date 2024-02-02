@@ -1,0 +1,202 @@
+Arbitraire
+
+	An arbitrary precision mathematics library. 
+	
+	Arbitraire supports a pure mathematics number system of continuous and
+	arbitrarily sized fractional data. The following algorithms are used:
+	
+	Division:
+		1. Knuth's TAOCP vol 2 Algorithm D
+
+	Subtraction and addition:
+		1. 5-loop (limited conditionals)
+		2. compact (intensive conditionals)
+
+	Multiplication:
+		1. Karatsuba method (>1000 limb)
+		2. long-multiplication method (<1000 limb)
+
+	Square root:
+		1. Newton's method
+		2. Fibonacci's method
+
+	Arbitraire strictly follows POSIX and the C99/C11 standards, and so, is
+	portable to any POSIX compliant system and works with all of the
+	architectures offered by linux, mac, BSD and many other systems.
+
+	Arbitraire's "fxdpnt" number system allows for efficient POSIX 
+	compliant implementations of POSIX bc. It is a "pen and paper" style of
+	number system yet with POSIX bc scale and printing semantics. For these 
+	semantics the 'base' field has to be set to 10. However, the ability to 
+	operate natively in other bases is left as a decision to the caller.
+
+	Arbitraire is an original work
+
+
+BUILDING:
+---------
+
+	git clone https://github.com/hlibc/libmpm
+	cd libmpm
+	./configure --prefix=$(pwd)/usr 
+	CFLAGS="-O3" make
+	make install
+
+	Arbitraire should be built at optimization level -O3, but nonetheless
+	performs fine with no optimization.
+
+	The contents of tests/ is not installed. This method is for installing
+	libmpm on a target system, for testing and developing libmpm
+	see TESTING: below.
+
+
+TESTING:
+--------
+
+	Test the core operations (add, mul, sub, div and sqrt) with a series 
+	of pseudo-random 10-10000 digit numbers.
+
+		make test
+
+	Test the core operations with valgrind:
+
+		make release
+
+		This should output the number "1100" showing that 1100 tests
+		were performed that showed no memory errors or leaks.
+
+
+	Run the test wrappers and binaries:
+	
+		./tests/random-wrapper.sh add|mul|sub|div|sqrt 10000 null
+	
+		(argument agnostic, (functions of the form f(a, a, a));
+		./tests/random-wrapper.sh add|mul|sub|div|sqrt 10000 agnostic
+
+
+	Automatic testing with valgrind|strace|time:
+
+		./tests/random-wrapper.sh sqrt 10000 null valgrind|strace|time
+
+	"random-wrapper.sh" wraps "random-tests" by invoking it 100 times,
+	logging its output and allowing it to be ran with other tools. However,
+	random-tests can also be used on its own:
+
+		./tests/random-tests div 10000 null
+
+		or for argument agnostic:
+
+		./tests/random-tests div 10000 agnostic
+
+	Each function also has its own test, for instance, to add two numbers:
+
+		./tests/add 123 123 10
+
+
+USING THE API:
+--------------
+
+	An example for writing a program to add two numbers is provided 
+	below:
+
+	#include <libmpm/libmpm.h>
+
+	int main(int argc, char *argv[])
+	{
+		if (argc < 4 )
+			arb_error("Needs 3 args, such as: 123.456 123.456 base");
+
+		int base = strtol(argv[3], NULL, 10);
+		fxdpnt *a, *b, *c = NULL;
+		a = arb_str2fxdpnt(argv[1]);
+		b = arb_str2fxdpnt(argv[2]);
+		c = arb_add(a, b, c, base);
+		arb_print(c);
+		arb_free(a);
+		arb_free(b);
+		arb_free(c);
+		return 0;
+	}
+
+	Compile the example program as follows:
+
+		cc example.c liblibmpm.a -I./include
+
+	You can also compile your programs against libmpm by either
+	installing it or by putting them inside of tests/ and running
+	./configure ; make
+
+	Bear in mind that 1 atexit slot of the C standard library is consumed
+	by libmpm in order to free its "global" (file scope variables with 
+	external linkage) constants.
+
+	If you want to use the global constants for some reason, make sure not
+	to modify or free them. They are; zero, one, p5 (.5), two and ten.
+
+	It does not make much sense to try and pre-define arbitrarily sized
+	transcendental constants such as pi or e. If you need these types of
+	numbers you should generate them to the needed precision or include
+	them.
+
+
+	Hardware types can be converted to fxdpnt bignums using hrdware2arb.
+
+		fxdpnt *a = hrdware2arb(16123123);
+
+	This is not a very powerful or fast function as this is not a typical
+	internal operation for libmpm. It only supports size_t. If you
+	really need to use hardware types you should probably write a new set
+	of functions for this. Functions such as hrdware2arb, which allocate 
+	their own memory require that the caller free the memory using 
+	arb_free().
+	
+	Arbitraire's numbers are opaque objects, but can be accessed for
+	debugging using arb_size(), arb_allocated(), arb_sign() and arb_left(). 
+	Because of this, the numbers must be accessed as pure mathematical 
+	objects. Object opacity helps to provide a safe and portable interface 
+	which can withstand internal security changes and other updates without 
+	affecting the code which uses libmpm as a bignum library.
+
+
+DEBUGGING:
+----------
+
+	A special set of internal functions has been created.
+	They are:
+
+		add, sub, divv and mul.
+
+	These functions are not exposed by the API so as to preserve the
+	namespace.
+
+	These special debugging functions have a final field, which when
+	filled with a character string, will print that string and the
+	function name using __func__ and finally the result of the function.
+
+	If you don't compile with `CFLAGS=-D_ARB_DEBUG make' then it will
+	not be possible to activate the final field of these functions.
+	In this way, the final field can be populated but still not print
+	any information if it is never replaced with a NULL or 0 prior to
+	release.
+
+	These functions are used as follows:
+
+		mul(a, b, &c, base, scale, "message");
+		divv(a, b, &c, base, scale, "message");
+		add(a, b, &c, base, "message");
+		sub(a, b, &c, base, "message");
+
+	Generally, "message" would be populated with the name of the
+	variable you are using for the final "answer" which goes into
+	"c". The debugging functions then print the function name,
+	your message, and the final "answer" which goes into "c".
+
+	I use them as follows:
+
+		mul(a, b, c, base, scale, "c = ");
+
+	C has no way of knowing the variable names verbatim as they are
+	used, so in this way one can debug their work without interfering
+	in the programming process with extra lines of code to print their
+	results out to screen.
+
